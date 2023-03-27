@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -462,9 +463,16 @@ public class TestContainerBalancerTask {
       replicas.add(containerToTargetMap.get(container));
 
       ContainerInfo containerInfo = cidToInfoMap.get(container);
-      ContainerPlacementStatus placementStatus =
-          placementPolicy.validateContainerPlacement(replicas,
-              containerInfo.getReplicationConfig().getRequiredNodes());
+      ContainerPlacementStatus placementStatus;
+      if (containerInfo.getReplicationType() ==
+          HddsProtos.ReplicationType.RATIS) {
+        placementStatus = placementPolicy.validateContainerPlacement(replicas,
+            containerInfo.getReplicationConfig().getRequiredNodes());
+      } else {
+        placementStatus =
+            ecPlacementPolicy.validateContainerPlacement(replicas,
+                containerInfo.getReplicationConfig().getRequiredNodes());
+      }
       Assertions.assertTrue(placementStatus.isPolicySatisfied());
     }
   }
@@ -1015,6 +1023,20 @@ public class TestContainerBalancerTask {
     Assertions.assertFalse(balancingThread.isAlive());
   }
 
+  @Test
+  public void testExclusion() {
+    Set<ContainerID> set = new HashSet<>(3);
+    set.add(ContainerID.valueOf(1));
+    set.add(ContainerID.valueOf(2));
+    set.add(ContainerID.valueOf(3));
+
+    String excludeContainers = "1, 2";
+    balancerConfiguration.setExcludeContainers(excludeContainers);
+    Set<ContainerID> toRemove = balancerConfiguration.getExcludeContainers();
+    set.removeAll(toRemove);
+    Assertions.assertFalse(set.contains(ContainerID.valueOf(2)));
+  }
+
   /**
    * Determines unBalanced nodes, that is, over and under utilized nodes,
    * according to the generated utilization values for nodes and the threshold.
@@ -1139,14 +1161,23 @@ public class TestContainerBalancerTask {
   }
 
   private ContainerInfo createContainer(long id, int multiple) {
-    return new ContainerInfo.Builder()
+    ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setContainerID(id)
-        .setReplicationConfig(RatisReplicationConfig
-                .getInstance(HddsProtos.ReplicationFactor.THREE))
         .setState(HddsProtos.LifeCycleState.CLOSED)
         .setOwner("TestContainerBalancer")
-        .setUsedBytes(STORAGE_UNIT * multiple)
-        .build();
+        .setUsedBytes(STORAGE_UNIT * multiple);
+
+    /*
+    Make it a RATIS container if multiple is even, else make it an EC container
+     */
+    if (multiple % 2 == 0) {
+      builder.setReplicationConfig(RatisReplicationConfig
+          .getInstance(HddsProtos.ReplicationFactor.THREE));
+    } else {
+      builder.setReplicationConfig(new ECReplicationConfig(3, 2));
+    }
+
+    return builder.build();
   }
 
   /**
@@ -1163,7 +1194,7 @@ public class TestContainerBalancerTask {
 
         // randomly pick a datanode for this replica
         int datanodeIndex = RANDOM.nextInt(0, numberOfNodes);
-        if (nodeUtilizations.get(i) != 0.0d) {
+        if (nodeUtilizations.get(datanodeIndex) != 0.0d) {
           DatanodeDetails node =
               nodesInCluster.get(datanodeIndex).getDatanodeDetails();
           Set<ContainerReplica> replicas =
@@ -1171,6 +1202,8 @@ public class TestContainerBalancerTask {
           replicas.add(createReplica(container.containerID(), node,
               container.getUsedBytes()));
           cidToReplicasMap.put(container.containerID(), replicas);
+          datanodeToContainersMap.get(nodesInCluster.get(datanodeIndex))
+              .add(container.containerID());
         }
       }
     }
