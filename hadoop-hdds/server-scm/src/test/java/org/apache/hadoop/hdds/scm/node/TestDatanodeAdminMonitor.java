@@ -323,7 +323,8 @@ public class TestDatanodeAdminMonitor {
     nodeManager.setContainers(decommissioningNode,
         ImmutableSet.of(container.containerID()));
 
-    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(container.containerID())))
+    Mockito.when(repManager.getContainerReplicaCount(
+            Mockito.eq(container.containerID())))
         .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, true));
 
