@@ -62,7 +62,7 @@ Check http return code
 Check if the listKeys api responds OK
     [Arguments]     ${volume}    ${bucket}
     Run Keyword if     '${SECURITY_ENABLED}' == 'true'     Kinit as ozone admin
-    ${result} =        Execute         curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/keys/listKeys?startPrefix=/${volume}/${bucket}&limit=1000"
+    ${result} =        Execute         curl --negotiate -u : -LSs ${API_ENDPOINT_URL}/keys/listKeys?startPrefix=/${volume}/${bucket}&limit=1000
     Should contain  ${result}   "OK"
     Should contain  ${result}   "keys"
     Should contain  ${result}   "${volume}"
