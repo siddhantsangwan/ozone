@@ -242,7 +242,7 @@
             </goals>
             <configuration>
               <pluginId>grpc-java</pluginId>
-              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <pluginExecutable>/Users/siddhant.sangwan/.m2/repository/io/grpc/protoc-gen-grpc-java/1.67.1/protoc-gen-grpc-java-1.67.1-osx-aarch_64</pluginExecutable>
             </configuration>
           </execution>
         </executions>
